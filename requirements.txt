@@ -1,21 +1,15 @@
-# --- Core Web & Systems ---
-fastapi[all]==0.115.0     # High-performance API framework
-uvicorn[standard]         # Fast ASGI server
-redis                     # Messaging bridge for C++ and Python
-celery[redis]             # Background task worker (the Consumer)
+# --- Web Server & API ---
+fastapi==0.110.0
+uvicorn[standard]==0.27.1
+pydantic==2.6.1
 
-# --- Local AI Engines ---
-ollama                    # Official Python SDK for Ollama (Llama 3, Mistral)
-faster-whisper            # High-speed local STT (CTranslate2 backend)
-torch                     # Required for tensor operations in Whisper
-sentence-transformers     # Local embedding models (all-MiniLM-L6-v2)
-
-# --- Data & Memory ---
-chromadb                  # Open-source local vector database (RAG)
-sqlalchemy                # Database toolkit for SQLite (metadata)
-psutil                    # Monitoring system vitals on the Python side
+# --- Networking & HTTP ---
+httpx==0.27.0        # Modern async client for internal API calls
+requests==2.31.0     # Standard for simple synchronous scripts
 
 # --- Utilities ---
-python-dotenv             # Environment variable management
-aiofiles                  # Asynchronous file I/O for log processing
-python-multipart          # Handling audio file streams from the frontend
+python-multipart==0.0.9  # Required if you ever want to upload files/logs
+psutil==5.9.8            # Optional: Let Python double-check its own system stats
+
+# --- Future AI Expansion (Commented out for now) ---
+#ollama               # For local LLM integration
