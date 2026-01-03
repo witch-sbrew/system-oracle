@@ -1,6 +1,5 @@
 #define _LIBCPP_DISABLE_AVAILABILITY
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -8,10 +7,12 @@
 #include <array>
 #include <thread>
 #include <chrono>
-#include <ctime>
 #include <libproc.h>
 #include <curl/curl.h>
 #include <unistd.h>
+#include <format>
+#include <iterator>
+
 using namespace std::string_view_literals;
 
 struct ProcessInfo
@@ -74,7 +75,7 @@ std::vector<ProcessInfo> get_processes()
         std::cout << "Checking: " << path_view << std::endl;
         ProcessInfo info;
         info.pid = pids[i];
-        info.path = true; // std::string(path_view);
+        info.path = std::string(path_view);
         info.is_dev_tool = is_development_tool(path_view);
 
         size_t last_slash = path_view.find_last_of('/');
@@ -88,11 +89,68 @@ std::vector<ProcessInfo> get_processes()
   return processes;
 }
 
+// Build the JSON pack without allocating hundreds of tiny temporary strings
+std::string serialize_processes(const std::vector<ProcessInfo> &procs)
+{
+  std::string buffer;
+  buffer.reserve(procs.size() * 128);
+
+  buffer.append("{\"processes\":[");
+  for (size_t i = 0; i < procs.size(); ++i)
+  {
+    std::format_to(std::back_inserter(buffer),
+                   "{{\"pid\":{},\"name\":\"{}\",\"path\":\"{}\"}}",
+                   procs[i].pid, procs[i].name, procs[i].path);
+
+    if (i < procs.size() - 1)
+      buffer.push_back(',');
+  }
+
+  buffer.append("]}");
+  return buffer;
+}
+
+// Telemetry Shipper (Pack, Address, Ship)
+bool ship_telemetry(const std::vector<ProcessInfo> &procs, std::string_view url)
+{
+  if (procs.empty())
+    return true;
+
+  // the shipper
+  CURL *curl = curl_easy_init();
+  if (!curl)
+    return false;
+
+  // generate pack/payload
+  std::string payload = serialize_processes(procs);
+
+  struct curl_slist *headers = nullptr;
+  headers = curl_slist_append(headers, "Content-Type: application/json");
+
+  // libcurl setup
+  curl_easy_setopt(curl, CURLOPT_URL, url.data());
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload.c_str());
+
+  // prevent stdout pollution from server responses
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, +[](void *, size_t s, size_t n, void *)
+                                                { return s * n; });
+
+  // address + send/blocking network transfer
+  CURLcode res = curl_easy_perform(curl);
+
+  curl_slist_free_all(headers);
+  curl_easy_cleanup(curl);
+
+  return res == CURLE_OK;
+}
+
 int main()
 {
   std::cout << "--- System Oracle: Collector Active ---" << std::endl;
   // Collector logic goes here
   curl_global_init(CURL_GLOBAL_ALL); // for libcurl stability
+  const std::string url = "http://localhost:8000/telemetry/ingest";
 
   int cycle = 0;
   while (true)
@@ -107,6 +165,15 @@ int main()
         std::cout << ", " << processes[1].name;
       }
       std::cout << ") ";
+    }
+
+    if (ship_telemetry(processes, url))
+    {
+      std::cout << "✓\n";
+    }
+    else
+    {
+      std::cout << "✗\n";
     }
 
     std::this_thread::sleep_for(std::chrono::seconds(5));
