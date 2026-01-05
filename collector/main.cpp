@@ -8,6 +8,7 @@
 #include <thread>
 #include <chrono>
 #include <libproc.h>
+#include <sys/time.h>
 #include <curl/curl.h>
 #include <unistd.h>
 #include <format>
@@ -20,7 +21,7 @@ struct ProcessInfo
   pid_t pid;
   std::string name;
   std::string path;
-  bool is_dev_tool;
+  uint64_t start_time;
 };
 
 // Determine if a path represents a development tool
@@ -74,9 +75,20 @@ std::vector<ProcessInfo> get_processes()
       {
         std::cout << "Checking: " << path_view << std::endl;
         ProcessInfo info;
+
+        // get process start time
+        struct proc_bsdinfo bsd_info;
+        if (proc_pidinfo(pids[i], PROC_PIDTBSDINFO, 0, &bsd_info, sizeof(bsd_info)) > 0)
+        {
+          info.start_time = bsd_info.pbi_start_tvsec;
+        }
+        else
+        {
+          info.start_time = 0; // tbd handle the "process just died" case
+        }
+
         info.pid = pids[i];
         info.path = std::string(path_view);
-        info.is_dev_tool = is_development_tool(path_view);
 
         size_t last_slash = path_view.find_last_of('/');
         info.name = (last_slash != std::string_view::npos)
