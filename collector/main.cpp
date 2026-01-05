@@ -111,8 +111,8 @@ std::string serialize_processes(const std::vector<ProcessInfo> &procs)
   for (size_t i = 0; i < procs.size(); ++i)
   {
     std::format_to(std::back_inserter(buffer),
-                   "{{\"pid\":{},\"name\":\"{}\",\"path\":\"{}\"}}",
-                   procs[i].pid, procs[i].name, procs[i].path);
+                   "{{\"pid\":{},\"name\":\"{}\",\"path\":\"{}\",\"start_time\":{}}}",
+                   procs[i].pid, procs[i].name, procs[i].path, procs[i].start_time);
 
     if (i < procs.size() - 1)
       buffer.push_back(',');
