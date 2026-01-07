@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import List
 import time
 import sqlite3
-from datetime import datetime
+from datetime import timedelta
 
 app = FastAPI()
 DB_PATH = "telemetry_history.db"
@@ -15,6 +15,7 @@ class ProcessInfo(BaseModel):
     name: str
     path: str
     start_time: int
+    human_duration: int
 
 
 # { "processes": [...] } structure
@@ -90,6 +91,25 @@ async def ingest_telemetry(data: ProcessList):
     conn.commit()
     conn.close()
     return {"status": "ok"}
+
+
+@app.get("/sessions")
+async def get_sessions():
+    """A quick helper to see what's happening in plain English."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    rows = c.execute(
+        "SELECT name, status, start_time, last_seen FROM activity"
+    ).fetchall()
+    conn.close()
+
+    results = []
+    for r in rows:
+        duration = r[3] - r[2]
+        results.append(
+            {"name": r[0], "status": r[1], "duration": str(timedelta(seconds=duration))}
+        )
+    return results
 
 
 @app.get("/")
